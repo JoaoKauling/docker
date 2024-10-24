@@ -1,0 +1,44 @@
+version: '3'
+services:
+  node1:
+    image: ubuntu:20.04
+    container_name: k8s-node1
+    privileged: true
+    stdin_open: true
+    tty: true
+    hostname: node1
+    networks:
+      k8s-network:
+        ipv4_address: 172.30.0.2
+
+
+  node2:
+    image: ubuntu:20.04
+    container_name: k8s-node2
+    privileged: true
+    stdin_open: true
+    tty: true
+    hostname: node2
+    networks:
+      k8s-network:
+        ipv4_address: 172.30.0.3
+
+
+  node3:
+    image: ubuntu:20.04
+    container_name: k8s-node3
+    privileged: true
+    stdin_open: true
+    tty: true
+    hostname: node3
+    networks:
+      k8s-network:
+        ipv4_address: 172.30.0.4
+
+
+networks:
+  k8s-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
