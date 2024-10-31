@@ -1,0 +1,127 @@
+###############################
+# Low Level container runtime
+# https://github.com/opencontainers/runc/releases
+###############################
+
+# Download runc
+- name: Download runc
+  copy:
+    src: runc/{{ runc_version }}/runc.{{ host_arch }}
+    dest: /tmp/runc
+
+# Install runc
+- name: Install runc
+  command: install -m 755 /tmp/runc /usr/local/sbin/runc
+
+# Remove /tmp/runc
+- name: Remove /tmp/runc
+  file:
+    path: /tmp/runc
+    state: absent
+
+###############################
+# CNI Plugins
+# https://github.com/containernetworking/plugins/releases
+###############################
+
+# Download CNI Plugins
+- name: Download CNI Plugins
+  copy:
+    src: cni-plugins/cni-plugins-linux-{{ host_arch }}-v{{ cni_plugins_version }}.tgz
+    dest: /tmp/cni-plugins.tgz
+
+# Create /opt/cni/bin directory
+- name: Create /opt/cni/bin directory
+  file:
+    path: "/opt/cni/bin"
+    state: directory
+    mode: 0755   
+
+# Install CNI Plugins
+- name: Install CNI Plugins
+  command: tar -C /opt/cni/bin -xzf /tmp/cni-plugins.tgz
+
+# Remove /tmp/cni-plugins.tgz
+- name: Remove /tmp/cni-plugins.tgz
+  file:
+    path: /tmp/cni-plugins.tgz
+    state: absent
+
+# Configure CNI Networking
+- name: Configure CNI Networking
+  template:
+    src: "{{item}}"
+    dest: /etc/cni/net.d/
+  loop:
+    - "10-bridge.conf"
+    - "99-loopback.conf"
+
+# Configure SUBNET
+- name: Configure SUBNET
+  shell: |
+    sed "s|SUBNET|{{ subnet }}|g" /etc/cni/net.d/10-bridge.conf > /etc/cni/net.d/10-bridge.conf.tmp
+    mv /etc/cni/net.d/10-bridge.conf.tmp /etc/cni/net.d/10-bridge.conf
+
+###############################
+# High Level container runtime
+# https://github.com/containerd/containerd/releases
+###############################
+
+# Download containerd
+- name: Download containerd
+  copy:
+    src: containerd/containerd-{{ containerd_version }}-rc.6-linux-{{ host_arch }}.tar.gz
+    dest: /tmp/containerd.tar.gz
+
+# Install containerd
+- name: Install containerd
+  command: tar Cxzvf /usr/local /tmp/containerd.tar.gz
+
+# Template for containerd.service
+- name: Template for containerd.service
+  template:
+    src: containerd.service
+    dest: /etc/systemd/system/containerd.service
+
+# Template for config.toml
+- name: Template for config.toml
+  template:
+    src: containerd-config.toml
+    dest: /etc/containerd/config.toml
+
+# Enable and start containerd.service
+- name: Enable and start containerd.service
+  shell: |
+    systemctl daemon-reload
+    systemctl enable containerd.service
+    rm -rf /run/containerd
+    systemctl start containerd.service
+    systemctl restart containerd.service
+
+# Remove /tmp/containerd.tar.gz
+- name: Remove /tmp/containerd.tar.gz
+  file:
+    path: /tmp/containerd.tar.gz
+    state: absent
+
+
+###############################
+# crictl
+# https://github.com/kubernetes-sigs/cri-tools/releases
+###############################
+
+# Download crictl
+- name: Download crictl
+  copy:
+    src: crictl/crictl-v{{ crictl_version }}-linux-{{ host_arch }}.tar.gz
+    dest: /tmp/crictl.tar.gz
+
+# Install crictl
+- name: Install crictl
+  command: tar zxvf /tmp/crictl.tar.gz -C /usr/local/bin
+
+# Remove /tmp/crictl.tar.gz
+- name: Remove /tmp/crictl.tar.gz
+  file:
+    path: /tmp/crictl.tar.gz
+    state: absent

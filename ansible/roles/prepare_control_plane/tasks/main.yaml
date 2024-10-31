@@ -1,0 +1,132 @@
+
+###############################
+# kube-apiserver
+# https://kubernetes.io/releases/download/
+###############################
+
+# Download kube-apiserver
+- name: Download kube-apiserver
+  copy:
+    src: kube-apiserver_v{{ k8s_version }}
+    dest: /tmp/kube-apiserver
+  when: host_type == "control_plane"
+
+# Install kube-apiserver
+- name: Install kube-apiserver
+  command: install -m 755 /tmp/kube-apiserver /usr/local/bin/
+  when: host_type == "control_plane"
+
+# Template for kube-apiserver.service
+- name: Template for kube-apiserver.service
+  template:
+    src: kube-apiserver.service
+    dest: /etc/systemd/system/kube-apiserver.service
+  when: host_type == "control_plane"
+
+# Template for kube-apiserver.service
+- name: Template for kube-apiserver.service
+  template:
+    src: encryption-config.yaml
+    dest: /etc/kubernetes/config/encryption-config.yaml    
+  when: host_type == "control_plane"
+
+# Enable and start kube-apiserver.service
+- name: Enable and start kube-apiserver.service
+  shell: |
+    systemctl daemon-reload
+    systemctl enable kube-apiserver.service
+    systemctl stop kube-apiserver.service
+  when: host_type == "control_plane"
+
+###############################
+# kube-scheduler
+# https://kubernetes.io/releases/download/
+###############################
+
+# Download kube-scheduler
+- name: Download kube-scheduler
+  copy:
+    src: kube-scheduler_v{{ k8s_version }}
+    dest: /tmp/kube-scheduler
+  when: host_type == "control_plane"
+
+# Install kube-scheduler
+- name: Install kube-scheduler
+  command: install -m 755 /tmp/kube-scheduler /usr/local/bin/
+  when: host_type == "control_plane"
+
+# Template for kube-scheduler.yaml
+- name: Template for kube-scheduler.yaml
+  template:
+    src: kube-scheduler.yaml
+    dest: /etc/kubernetes/config/kube-scheduler.yaml
+  when: host_type == "control_plane"
+
+# Template for kube-scheduler.service
+- name: Template for kube-scheduler.service
+  template:
+    src: kube-scheduler.service
+    dest: /etc/systemd/system/kube-scheduler.service
+  when: host_type == "control_plane"
+
+# Enable and start kube-scheduler.service
+- name: Enable and start kube-scheduler.service
+  shell: |
+    systemctl daemon-reload
+    systemctl enable kube-scheduler.service
+    systemctl stop kube-scheduler.service
+  when: host_type == "control_plane"
+
+
+###############################
+# kube-controller-manager
+# https://kubernetes.io/releases/download/
+###############################
+
+# Download kube-controller-manager
+- name: Download kube-controller-manager
+  copy:
+    src: kube-controller-manager_v{{ k8s_version }}
+    dest: /tmp/kube-controller-manager
+  when: host_type == "control_plane"
+
+# Install kube-controller-manager
+- name: Install kube-controller-manager
+  command: install -m 755 /tmp/kube-controller-manager /usr/local/bin/
+  when: host_type == "control_plane"
+
+# Template for kube-controller-manager.service
+- name: Template for kube-controller-manager.service
+  template:
+    src: kube-controller-manager.service
+    dest: /etc/systemd/system/kube-controller-manager.service
+  when: host_type == "control_plane"
+
+# Enable and start kube-controller-manager.service
+- name: Enable and start kube-controller-manager.service
+  shell: |
+    systemctl daemon-reload
+    systemctl enable kube-controller-manager.service
+    systemctl stop kube-controller-manager.service
+  when: host_type == "control_plane"
+
+###############################
+#
+#
+###############################
+# Remove /tmp/kubelet
+- name: Remove /tmp/kubelet
+  file:
+    path: "{{item}}"
+    state: absent
+  loop:
+    - "/tmp/kube-apiserver"
+    - "/tmp/kube-controller-manager"
+    - "/tmp/kube-scheduler"
+  when: host_type == "control_plane"
+
+# sudo journalctl -u kube-apiserver.service -f
+# sudo journalctl -u kube-scheduler.service -f
+
+# systemctl status kube-apiserver.service
+# systemctl status kube-scheduler.service

@@ -1,0 +1,20 @@
+               _                               _             
+  /\ /\ _   _ | |__    ___  _ __  _ __    ___ | |_  ___  ___ 
+ / //_/| | | || '_ \  / _ \| '__|| '_ \  / _ \| __|/ _ \/ __|
+/ __ \ | |_| || |_) ||  __/| |   | | | ||  __/| |_|  __/\__ \
+\/  \/  \__,_||_.__/  \___||_|   |_| |_| \___| \__|\___||___/
+
+Node Name     : $(hostname)
+Cluster State : $(kubectl get nodes | grep $(hostname) | awk '{print $2}')
+K8s Version   : $(kubectl version --short | grep 'Server Version' | awk '{print $3}')
+CPU Usage     : $(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}')
+Memory Usage  : $(free -m | awk 'NR==2{printf "%.2f%%", $3*100/$2 }')
+IP Address    : $(hostname -I | awk '{print $1}')
+───────────────────────────────────────────────────────
+                 Pod Summary
+───────────────────────────────────────────────────────
+
+Running Pods  : $(kubectl get pods --all-namespaces --field-selector=status.phase=Running --no-headers | wc -l)
+Pending Pods  : $(kubectl get pods --all-namespaces --field-selector=status.phase=Pending --no-headers | wc -l)
+Failed Pods   : $(kubectl get pods --all-namespaces --field-selector=status.phase=Failed --no-headers | wc -l)
+───────────────────────────────────────────────────────

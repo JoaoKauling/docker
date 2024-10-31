@@ -1,0 +1,43 @@
+###############################
+# certificates
+# 
+###############################
+
+# Download files to /tmp/k8s_config/
+- name: Download files to /tmp/k8s_config/
+  copy:
+    src: "{{ item }}"
+    dest: /tmp/k8s_config/
+    mode: 0777   
+  loop:
+    - generate_certs.sh
+  when: host_type == "control_plane"
+
+# Template files to /tmp/k8s_config/
+- name: Template files to /tmp/k8s_config/
+  template:
+    src: "{{ item }}"
+    dest: /tmp/k8s_config/
+  loop:                   
+    - ca.conf  
+    - config.ini
+  when: host_type == "control_plane"
+
+- name: Remove carriage return characters from generate_certs.sh
+  command: sed -i 's/\r$//' /tmp/k8s_config/generate_certs.sh
+  when: host_type == "control_plane"
+
+# Generate certificates
+- name: Generate certificates
+  command: /tmp/k8s_config/generate_certs.sh /tmp/k8s_config/config.ini -n
+  register: cert_generation
+  failed_when: cert_generation.rc != 0
+  ignore_errors: false
+  when: host_type == "control_plane"
+
+# Send certificates to /etc/kubernetes/pki/
+- name: Send certificates to /etc/kubernetes/pki/
+  shell: |
+    cp /tmp/k8s_config/*.crt /tmp/k8s_config/*.key /tmp/k8s_config/*.csr /etc/kubernetes/pki/
+  when: host_type == "control_plane"
+

@@ -1,0 +1,50 @@
+###############################
+#
+###############################
+
+# Stop and start worker node services
+- name: Stop and start worker node services
+  shell: |
+    systemctl stop {{item}}
+    systemctl start {{item}}
+  loop:
+    - "containerd.service"
+    - "etcd.service"
+    - "kubelet.service"
+    - "kube-proxy.service"
+  when: host_type == "node"
+
+# Stop and start control-plane services
+- name: Stop and start control-plane services
+  shell: |
+    systemctl stop {{item}}
+    systemctl start {{item}}
+  loop:
+    - "containerd.service"
+    - "etcd.service"
+    - "kubelet.service"
+    - "kube-apiserver.service"
+    - "kube-scheduler.service"
+    - "kube-controller-manager.service"
+  when: host_type == "control_plane"
+
+
+# sudo journalctl -u kubelet.service -f
+# sudo journalctl -u etcd.service -f
+
+# sudo systemctl status kubelet.service
+# sudo systemctl status etcd.service
+# sudo systemctl status kube-scheduler
+
+# sudo systemctl status containerd.service
+# sudo systemctl status etcd.service
+# sudo systemctl status kubelet.service
+# sudo systemctl status kube-apiserver.service
+# sudo systemctl status kube-scheduler.service
+# sudo systemctl status kube-controller-manager.service
+
+# kubectl get events --sort-by='.metadata.creationTimestamp'
+# kubectl describe node k8scontrol1 | grep Taints
+# sudo systemctl stop containerd ; sudo rm -rf /run/containerd ; sudo systemctl start containerd
+
+# kubectl create serviceaccount default --namespace=default

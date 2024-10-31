@@ -1,0 +1,12 @@
+- name: Default playbook - Starting Deploy
+  hosts: all
+  become: true
+  roles:
+    #- prepare_env
+    - container_runtime    
+    - prepare_kubelet_etcd
+    #- prepare_control_plane
+    #- prepare_worker_nodes
+    #- certificates
+    - restart
+

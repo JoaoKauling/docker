@@ -1,0 +1,45 @@
+
+###############################
+# kube-proxy
+# https://kubernetes.io/releases/download/
+###############################
+
+# Download kube-proxy
+- name: Download kube-proxy
+  copy:
+    src: kube-proxy_v{{ k8s_version }}
+    dest: /tmp/kube-proxy
+  when: host_type == "node"
+
+# Install kube-proxy
+- name: Install kube-proxy
+  command: install -m 755 /tmp/kube-proxy /usr/local/bin/
+  when: host_type == "node"
+
+# Template for kube-proxy.service
+- name: Template for kube-proxy.service
+  template:
+    src: kube-proxy.service
+    dest: /etc/systemd/system/kube-proxy.service
+  when: host_type == "node"
+
+# Template for kube-proxy-config.yaml
+- name: Template for kube-proxy-config.yaml
+  template:
+    src: kube-proxy-config.yaml
+    dest: /etc/kubernetes/config/kube-proxy-config.yaml
+  when: host_type == "node"
+
+# Enable and start kube-proxy.service
+- name: Enable and start kube-proxy.service
+  shell: |
+    systemctl daemon-reload
+    systemctl enable kube-proxy.service
+    systemctl stop kube-proxy.service
+  when: host_type == "node"
+
+
+# sudo journalctl -u kube-proxy.service -f
+
+# systemctl status kube-proxy.service
+

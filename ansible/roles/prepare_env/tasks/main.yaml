@@ -1,0 +1,87 @@
+###############################
+# prepare_env
+###############################
+
+# Update all packages on Ubuntu
+- name: Update all packages on Ubuntu
+  apt:
+    update_cache: yes
+    upgrade: dist
+
+#Install necessary packages
+- name: Install necessary packages
+  apt:
+    name: "{{ packages }}"
+    state: latest
+  vars:
+    packages:
+      - sudo 
+      - ksh
+      - bash
+      - socat 
+      - conntrack 
+      - ipset
+
+- name: Set sudoers
+  copy:
+    dest: /etc/sudoers.d/{{ root_user }}
+    content: |
+      {{ root_user }} ALL=(ALL) NOPASSWD: ALL
+    owner: root
+    group: root
+    mode: '0440'
+  when: ansible_os_family != 'RedHat'  
+
+
+- name: Add hosts to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ hostvars[item].host_ip }} {{ item }}"
+    state: present
+  loop: "{{ groups['all'] }}"
+  when: hostvars[item].host_ip is defined
+
+- name: set-hostname
+  shell: hostnamectl set-hostname {{ inventory_hostname }}  
+
+#MOTD template
+- name: MOTD template
+  template:
+    src: motd
+    dest: /etc/motd
+    force: yes
+    owner: root
+    group: root
+
+# Profile k8s_profile
+- name: Profile k8s_profile
+  template:
+    src: k8s_profile.sh
+    dest: /etc/profile.d/k8s_profile.sh
+    force: yes
+    owner: root
+    group: root
+
+#Create directory structure for kubernetes
+- name: Create directory structure for kubernetes
+  file:
+    path: "{{item}}"
+    state: directory
+    mode: 0755
+  loop:
+    - "/etc/containerd/"
+    - "/etc/kubernetes/"
+    - "/etc/kubernetes/manifests/"
+    - "/etc/kubernetes/config/"
+    - "/etc/kubernetes/pki/"
+    - "/etc/kubernetes/scripts/"
+    - "/etc/etcd/"
+
+#Create directory structure for kubernetes
+- name: Create directory structure for kubernetes
+  file:
+    path: "{{item}}"
+    state: directory
+    mode: 0777
+  loop:
+    - /tmp/k8s_config/
