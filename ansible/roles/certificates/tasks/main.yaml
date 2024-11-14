@@ -11,7 +11,8 @@
     mode: 0777   
   loop:
     - generate_certs.sh
-  when: host_type == "control_plane"
+    - generate_ppk.sh
+  when: host_type == "control_plane_master"
 
 # Template files to /tmp/k8s_config/
 - name: Template files to /tmp/k8s_config/
@@ -21,23 +22,68 @@
   loop:                   
     - ca.conf  
     - config.ini
-  when: host_type == "control_plane"
+  when: host_type == "control_plane_master"
+
+# Send script to /etc/kubernetes/scripts/
+- name: Send script to /etc/kubernetes/scripts/
+  shell: |
+    cp /tmp/k8s_config/generate_certs.sh  /tmp/k8s_config/generate_ppk.sh /etc/kubernetes/scripts/
+    cp /tmp/k8s_config/ca.conf  /tmp/k8s_config/config.ini /etc/kubernetes/scripts/
+  when: host_type == "control_plane_master"
+
+- name: Generate hosts file
+  template:
+    src: hosts
+    dest: /tmp/k8s_config/hosts  
+  when: host_type == "control_plane_master"
 
 - name: Remove carriage return characters from generate_certs.sh
   command: sed -i 's/\r$//' /tmp/k8s_config/generate_certs.sh
-  when: host_type == "control_plane"
+  when: host_type == "control_plane_master"
 
-# Generate certificates
-- name: Generate certificates
-  command: /tmp/k8s_config/generate_certs.sh /tmp/k8s_config/config.ini -n
+- name: Remove carriage return characters from generate_ppk.sh
+  command: sed -i 's/\r$//' /tmp/k8s_config/generate_ppk.sh
+  when: host_type == "control_plane_master"
+
+# Generate ca certificate
+- name: Generate ca certificate
+  command: /tmp/k8s_config/generate_certs.sh /tmp/k8s_config/config.ini -ca
   register: cert_generation
   failed_when: cert_generation.rc != 0
   ignore_errors: false
-  when: host_type == "control_plane"
+  when: host_type == "control_plane_master"
 
-# Send certificates to /etc/kubernetes/pki/
-- name: Send certificates to /etc/kubernetes/pki/
+# Generate certificates
+- name: Generate certificates
+  command: /tmp/k8s_config/generate_certs.sh /tmp/k8s_config/config.ini -cert
+  register: cert_generation
+  failed_when: cert_generation.rc != 0
+  ignore_errors: false
+  when: host_type == "control_plane_master"
+
+# Generate config
+- name: Generate config
+  command: /tmp/k8s_config/generate_certs.sh /tmp/k8s_config/config.ini -config
+  register: cert_generation
+  failed_when: cert_generation.rc != 0
+  ignore_errors: false
+  when: host_type == "control_plane_master"
+
+# Moving config
+- name: Moving config
+  command: /tmp/k8s_config/generate_certs.sh /tmp/k8s_config/config.ini -move
+  register: cert_generation
+  failed_when: cert_generation.rc != 0
+  ignore_errors: false
+  when: host_type == "control_plane_master"
+
+# Send certificates to .kube/config
+- name: Send certificates to .kube/config
   shell: |
-    cp /tmp/k8s_config/*.crt /tmp/k8s_config/*.key /tmp/k8s_config/*.csr /etc/kubernetes/pki/
-  when: host_type == "control_plane"
+    cp /tmp/k8s_config/generate_certs.sh  /tmp/k8s_config/generate_ppk.sh /etc/kubernetes/scripts/
+    cp /etc/kubernetes/admin.config /home/{{ root_user }}/.kube/config
+    chmod 777 /home/{{ root_user }}/.kube/config
+  when: host_type == "control_plane_master"
 
+# awk '/client-certificate-data:/ {print $2}' ~/.kube/config | base64 -d
+# awk '/client-certificate-data:/ {print $2}' ~/.kube/config | base64 -d | openssl x509 -text --noout

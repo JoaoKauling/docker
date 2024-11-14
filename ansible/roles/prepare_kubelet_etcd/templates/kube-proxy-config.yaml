@@ -1,0 +1,11 @@
+kind: KubeProxyConfiguration
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+clientConnection:
+  kubeconfig: "/etc/kubernetes/kube-proxy.config"
+mode: "iptables"
+clusterCIDR: "{{ clusterCIDR }}"
+nodePortAddresses:
+  - "{{ serverCIDR }}"
+#masqueradeAll: true -> foi necessario para permitir a comunicacao de pod-to-pod do mesmo node
+iptables:
+  masqueradeAll: true

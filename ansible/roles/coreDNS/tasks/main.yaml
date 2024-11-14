@@ -1,0 +1,27 @@
+###############################
+#CoreDNS
+###############################
+
+# Configure CNI Networking
+- name: Configure CNI Networking
+  template:
+    src: "coredns.yaml"
+    dest: /etc/kubernetes/config/
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+
+# Enable and start kube-scheduler.service
+- name: Enable and start kube-scheduler.service
+  shell: |
+    kubectl delete -f /etc/kubernetes/config/coredns.yaml
+    kubectl apply -f /etc/kubernetes/config/coredns.yaml
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+
+
+
+# sudo journalctl -u coredns.service -f
+
+
+# systemctl status coredns.service
+

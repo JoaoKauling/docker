@@ -1,0 +1,127 @@
+###############################
+#
+###############################
+
+# Stop control plane services
+- name: Stop control plane services
+  shell: |
+    systemctl stop kube-apiserver.service
+    systemctl stop kube-scheduler.service
+    systemctl stop kube-controller-manager.service
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Remove control plane
+- name: Remove control plane
+  file:
+    path: "{{item}}"
+    state: absent
+  loop:    
+    - "/usr/local/bin/kube-apiserver"
+    - "/etc/systemd/system/kube-apiserver.service"
+    - "/usr/local/bin/kube-scheduler"
+    - "/etc/systemd/system/kube-scheduler.service"
+    - "/usr/local/bin/kube-controller-manager"
+    - "/etc/systemd/system/kube-controller-manager.service"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Stop containerd.service
+- name: Stop containerd.service
+  shell: |
+    systemctl stop etcd.service
+    systemctl stop kubelet.service
+    systemctl stop kube-proxy.service
+
+# Remove etcd and kubelet 
+- name: Remove etcd and kubelet 
+  file:
+    path: "{{item}}"
+    state: absent
+  loop:    
+    - "/var/lib/etcd"
+    - "/usr/local/bin/etcd"
+    - "/usr/local/bin/etcdctl"
+    - "/usr/local/bin/etcdutl"
+    - "/etc/systemd/system/etcd.service"
+    - "/usr/local/bin/kubelet"
+    - "/etc/systemd/system/kubelet.service"
+    - "/usr/local/bin/kubectl"
+    - "/usr/local/bin/kube-proxy"
+    - "/etc/systemd/system/kube-proxy.service"
+
+# Stop containerd.service
+- name: Stop containerd.service
+  shell: |
+    systemctl stop containerd.service
+
+# Remove container runtime
+- name: Remove container runtime
+  file:
+    path: "{{item}}"
+    state: absent
+  loop:    
+    - "/etc/containerd/"
+    - "/opt/containerd/"
+    - "/usr/local/bin/containerd-stress"
+    - "/usr/local/bin/containerd-shim-runc-v2"  
+    - "/usr/local/bin/containerd"  
+    - "/usr/local/bin/ctr"
+    - "/usr/local/sbin/runc"
+    - "/opt/cni/"
+    - "/etc/cni/"
+    - "/etc/systemd/system/containerd.service"
+    - "/usr/local/bin/crictl"
+
+# Stop coredns.service
+#- name: Stop coredns.service
+#  shell: |
+#    systemctl stop coredns.service
+#  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Remove coredns
+- name: Remove coredns
+  file:
+    path: "{{item}}"
+    state: absent
+  loop:    
+    - "/etc/coredns/"
+    - "/etc/systemd/system/coredns.service"
+    - "/var/run/secrets/kubernetes.io/"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Remove all
+- name: Remove all
+  file:
+    path: "{{item}}"
+    state: absent
+  loop:
+    - "/etc/kubernetes/"
+    - "/etc/etcd/"
+    - "/tmp/k8s_config/"
+
+# systemctl daemon-reload
+- name: systemctl daemon-reload
+  shell: |
+    systemctl daemon-reload
+
+
+# Enable and start containerd.service
+- name: Remove containerd and etcd data
+  shell: |
+    rm -rf /run/containerd
+    rm -rf /var/lib/etcd/*
+
+# Remove route to other node subnets
+- name: Remove route to other node subnets
+  command:
+    cmd: "ip route del {{ hostvars[item].subnet }} via {{ hostvars[item].host_ip }} dev wlan0"
+  loop: "{{ groups['all'] }}"
+  when: hostvars[item].subnet != hostvars[inventory_hostname].subnet
+
+# Remove sudo
+- name: Remove sudo
+  file:
+    path: "{{item}}"
+    state: absent
+  loop:
+    - "/etc/sudoers.d/{{ root_user }}"
+

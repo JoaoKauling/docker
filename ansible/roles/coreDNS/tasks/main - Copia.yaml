@@ -1,0 +1,76 @@
+###############################
+#CoreDNS
+###############################
+
+# Download coredns
+- name: Download coredns
+  copy:
+    src: coredns_{{ coredns_version }}_linux_{{ host_arch }}.tgz
+    dest: /tmp/coredns.tgz
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Install CNI Plugins
+- name: Install CNI Plugins
+  command: tar -C /usr/local/bin/ -xzf /tmp/coredns.tgz
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Create /etc/coredns directory
+- name: Create /etc/coredns directory
+  file:
+    path: "/etc/coredns"
+    state: directory
+    mode: 0755   
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Configure CNI Networking
+- name: Configure CNI Networking
+  template:
+    src: "Corefile"
+    dest: /etc/coredns
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Template for containerd.service
+- name: Template for containerd.service
+  template:
+    src: coredns.service
+    dest: /etc/systemd/system/coredns.service
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Enable and start containerd.service
+- name: Enable and start containerd.service
+  shell: |
+    systemctl daemon-reload
+    systemctl enable coredns.service
+    systemctl start coredns.service
+    systemctl restart coredns.service
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Create /etc/coredns directory
+- name: Create /var/run/secrets/kubernetes.io/serviceaccount directory
+  file:
+    path: "/var/run/secrets/kubernetes.io/serviceaccount"
+    state: directory
+    mode: 0755   
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+# Enable and start kube-scheduler.service
+- name: Enable and start kube-scheduler.service
+  shell: |
+    ln -s /etc/kubernetes/pki/ca.crt /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    kubectl create serviceaccount coredns -n kube-system
+    kubectl create clusterrolebinding coredns --clusterrole=cluster-admin --serviceaccount=kube-system:coredns
+    kubectl create secret generic coredns-token --from-literal=token=$(openssl rand -base64 32) -n kube-system
+    kubectl patch serviceaccount coredns -n kube-system -p '{"secrets":[{"name":"coredns-token"}]}'
+    touch /var/run/secrets/kubernetes.io/serviceaccount/token
+    chmod 755 /var/run/secrets/kubernetes.io/serviceaccount/token
+    kubectl get secret $(kubectl get sa coredns -n kube-system -o jsonpath='{.secrets[0].name}') -n kube-system -o jsonpath='{.data.token}' | base64 --decode > /var/run/secrets/kubernetes.io/serviceaccount/token
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+
+
+
+# sudo journalctl -u coredns.service -f
+
+
+# systemctl status coredns.service
+

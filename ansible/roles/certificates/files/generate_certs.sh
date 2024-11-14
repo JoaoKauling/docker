@@ -6,9 +6,10 @@ function usage() {
   echo ""
   echo "Opções:"
   echo "  <arquivo_de_configuração>  O arquivo .ini com as configurações."
-  echo "  -n                    Gera todos os certificados."
-  echo "  -c                    Gera os arquivos config"
-  echo "  -m                    Move os certificados gerados para diretórios padrão."
+  echo "  -ca                   Gera certificado CA."
+  echo "  -cert                 Gera todos os certificados."
+  echo "  -config               Gera os arquivos config"
+  echo "  -move                 Move os certificados gerados para diretórios padrão."
   exit 1
 }
 
@@ -46,12 +47,13 @@ WORKER_NODE_USER=${worker_node_user:-root}
 # Converte listas em arrays
 control_plane_certificates=(${control_plane_certificates})
 worker_node_list=(${worker_node_list})
+control_plane_list=(${control_plane_list})
 
 # Cria o diretório de saída, se necessário
 mkdir -p "$OUTPUT_DIR" || { echo "Erro ao criar diretório de saída: $OUTPUT_DIR"; exit 1; }
 
-# Função para gerar certificados
-function generate_certificates() {
+
+function generate_ca() {
 
   echo "Gerando chave da CA: ca.key..."
   openssl genrsa -out "$OUTPUT_DIR/ca.key" 4096 || { echo "Erro ao gerar ca.key"; exit 1; }
@@ -64,6 +66,12 @@ function generate_certificates() {
 
    echo ""
    echo "-------------------------------------------"
+   echo "Geração de certificado CA concluída!"
+
+}
+
+# Função para gerar certificados
+function generate_certificates() {
 
   # Gera certificados para o plano de controle  
   # echo "${control_plane_certificates[@]}"
@@ -83,11 +91,12 @@ function generate_certificates() {
       -CAkey "$OUTPUT_DIR/ca.key" \
       -CAcreateserial \
       -out "$OUTPUT_DIR/$CERT_NAME.crt" || { echo "Erro ao criar $CERT_NAME.crt"; exit 1; }
+
     echo ""
     echo "-------------------------------------------"
   done
 
-  # Gera certificados para os nós worker
+    # Gera certificados para os nós worker
   for HOST in "${worker_node_list[@]}"; do
     echo "Gerando chave para: $HOST.key..."
     openssl genrsa -out "$OUTPUT_DIR/$HOST.key" 4096 || { echo "Erro ao gerar $HOST.key"; exit 1; }
@@ -105,7 +114,29 @@ function generate_certificates() {
       -CAcreateserial \
       -out "$OUTPUT_DIR/$HOST.crt" || { echo "Erro ao criar $HOST.crt"; exit 1; }
 
-    rm "$OUTPUT_DIR/$HOST.csr"  
+    echo ""
+    echo "-------------------------------------------"
+  done
+
+  # Gera certificados para os nós worker
+  for CONTROLPLANE in "${control_plane_list[@]}"; do
+    echo "Gerando chave para: $CONTROLPLANE.key..."
+    openssl genrsa -out "$OUTPUT_DIR/$CONTROLPLANE.key" 4096 || { echo "Erro ao gerar $CONTROLPLANE.key"; exit 1; }
+
+    echo "Criando CSR para: $CONTROLPLANE..."
+    openssl req -new -key "$OUTPUT_DIR/$CONTROLPLANE.key" -sha256 \
+      -config "$CA_CONF" -section "$CONTROLPLANE" \
+      -out "$OUTPUT_DIR/$CONTROLPLANE.csr" || { echo "Erro ao criar CSR para $CONTROLPLANE"; exit 1; }
+
+    echo "Criando certificado para: $CONTROLPLANE.crt..."
+    openssl x509 -req -days "$CERT_DAYS" -in "$OUTPUT_DIR/$CONTROLPLANE.csr" \
+      -copy_extensions copyall \
+      -sha256 -CA "$OUTPUT_DIR/ca.crt" \
+      -CAkey "$OUTPUT_DIR/ca.key" \
+      -CAcreateserial \
+      -out "$OUTPUT_DIR/$CONTROLPLANE.crt" || { echo "Erro ao criar $CONTROLPLANE.crt"; exit 1; }
+
+    rm "$OUTPUT_DIR/$CONTROLPLANE.csr"  
 
     echo ""
     echo "-------------------------------------------"
@@ -152,11 +183,19 @@ function configure_kubeconfig() {
     echo "-------------------------------------------"
   done
 
+  # Configura kubeconfig para os nós worker
+  for CONTROLPLANE in "${control_plane_list[@]}"; do
+    echo "Configurando kubeconfig para: $CONTROLPLANE..."
+    setup_kubeconfig "$OUTPUT_DIR/$CONTROLPLANE.config" "$KUBE_SERVER" "$CONTROLPLANE" "system:node:$CONTROLPLANE"
+    echo ""
+    echo "-------------------------------------------"
+  done
+
   # Configura kubeconfig para os binários
   for BINARY in "${control_plane_certificates[@]}"; do
     echo "Configurando kubeconfig para: $BINARY..."
     if [ "$BINARY" == "$CONTROL_PLANE_ADM" ]; then
-      setup_kubeconfig "$OUTPUT_DIR/kubelet.config" "$CONTROL_PLANE_SERVER" "admin" "$CONTROL_PLANE_ADM"
+      setup_kubeconfig "$OUTPUT_DIR/admin.config" "$CONTROL_PLANE_SERVER" "admin" "$CONTROL_PLANE_ADM"
     else
       setup_kubeconfig "$OUTPUT_DIR/${BINARY}.config" "$KUBE_SERVER" "$BINARY" "system:${BINARY}"
     fi
@@ -177,15 +216,30 @@ function move_files() {
   find "$OUTPUT_DIR" -name '*.crt' -exec cp {} "$CERT_DIR/" \;
   find "$OUTPUT_DIR" -name '*.config' -exec cp {} "$HOME_DIR/" \;
 
-  find "$OUTPUT_DIR" -name 'admin.key' -exec cp {} "$CERT_DIR/kubelet.key" \;
-  find "$OUTPUT_DIR" -name 'admin.crt' -exec cp {} "$CERT_DIR/kubelet.crt" \;
+  find "$OUTPUT_DIR" -name 'admin.config' -exec cp {} "$HOME/.kube/config" \;
+  find "$OUTPUT_DIR" -name "${HOSTNAME}.config" -exec cp {} "$HOME_DIR/kubelet.config" \;
+
+  find "$OUTPUT_DIR" -name "${HOSTNAME}.key" -exec cp {} "$CERT_DIR/kubelet.key" \;
+  find "$OUTPUT_DIR" -name "${HOSTNAME}.crt" -exec cp {} "$CERT_DIR/kubelet.crt" \;
+
+}
+
+# Função para exportar os arquivos para os nodes
+function export_files() {
+  echo "Exportando certificados e arquivos para os nodes..."
 
   for HOST in "${worker_node_list[@]}"; do
     echo "Configurando $HOST..."
 
     # Cria o diretório no destino com sudo
-    ssh $WORKER_NODE_USER@$HOST "mkdir -p /tmp/k8s_config" || {
+    ssh $WORKER_NODE_USER@$HOST "sudo mkdir -p /tmp/k8s_config" || {
       echo "Erro ao criar diretório em $HOST"
+      continue
+    }
+
+    # Copia o admin.config para um diretório temporário e move para o destino
+    scp admin.config $WORKER_NODE_USER@$HOST:/tmp/k8s_config/ || {
+      echo "Erro ao copiar admin.config para $HOST"
       continue
     }
 
@@ -194,6 +248,7 @@ function move_files() {
       echo "Erro ao copiar ca.crt para $HOST"
       continue
     }
+
     # Copia o certificado do kubelet para um diretório temporário e move para o destino
     scp "$HOST.crt" $WORKER_NODE_USER@$HOST:/tmp/k8s_config/kubelet.crt || {
       echo "Erro ao copiar kubelet.crt para $HOST"
@@ -215,6 +270,24 @@ function move_files() {
       continue
     }
 
+    # Movendo *.config
+    ssh $WORKER_NODE_USER@$HOST "sudo mv /tmp/k8s_config/*.config $HOME_DIR" || {
+      echo "Erro ao criar diretório em $HOST"
+      continue
+    }
+
+    # Movendo *.config
+    ssh $WORKER_NODE_USER@$HOST "sudo cp $HOME_DIR/admin.config /home/$WORKER_NODE_USER/.kube/config" || {
+      echo "Erro ao criar diretório em $HOST"
+      continue
+    }
+
+    # Movendo *.key e *.crt
+    ssh $WORKER_NODE_USER@$HOST "sudo mv /tmp/k8s_config/*.key /tmp/k8s_config/*.crt $CERT_DIR" || {
+      echo "Erro ao criar diretório em $HOST"
+      continue
+    }
+
     echo "Configuração concluída para $HOST."
 
   done
@@ -223,9 +296,11 @@ function move_files() {
 }
 
 case $2 in
-  -n ) generate_certificates ;;
-  -c ) configure_kubeconfig ;;
-  -m ) move_files ;;
+  -ca  ) generate_ca ;;
+  -cert ) generate_certificates ;;
+  -config ) configure_kubeconfig ;;
+  -move ) move_files ;;
+  -export ) export_files ;;
   * ) usage ;;
 esac
 

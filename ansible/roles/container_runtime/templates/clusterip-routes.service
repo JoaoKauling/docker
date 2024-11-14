@@ -1,0 +1,11 @@
+[Unit]
+Description=Add Static Routes for All Nodes
+After=network.target
+
+[Service]
+ExecStart=/bin/bash -c '{% for item in groups["all"] if hostvars[item].subnet != hostvars[inventory_hostname].subnet %}/usr/sbin/ip route add {{ hostvars[item].subnet }} via {{ hostvars[item].host_ip }}; {% endfor %} true'
+
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

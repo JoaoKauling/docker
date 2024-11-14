@@ -2,6 +2,21 @@
 #
 ###############################
 
+# Download files to /tmp/k8s_config/
+- name: Download files to /tmp/k8s_config/
+  copy:
+    src: "{{ item }}"
+    dest: /tmp/k8s_config/
+    mode: 0777   
+  loop:
+    - services.sh
+    - kube-apiserver-to-kubelet.yaml
+
+# Download services.sh
+- name: Download services.sh
+  shell: |
+    cp /tmp/k8s_config/services.sh  /etc/kubernetes/scripts/
+
 # Stop and start worker node services
 - name: Stop and start worker node services
   shell: |
@@ -22,19 +37,30 @@
   loop:
     - "containerd.service"
     - "etcd.service"
-    - "kubelet.service"
     - "kube-apiserver.service"
-    - "kube-scheduler.service"
     - "kube-controller-manager.service"
-  when: host_type == "control_plane"
+    - "kube-scheduler.service"
+    - "kubelet.service"
+    - "kube-proxy.service"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
+
+- name: Apply kube-apiserver-to-kubelet.yaml
+  shell: |
+    kubectl apply -f /tmp/k8s_config/kube-apiserver-to-kubelet.yaml --kubeconfig /etc/kubernetes/admin.config
+  when: host_type == "control_plane_master"
 
 
 # sudo journalctl -u kubelet.service -f
 # sudo journalctl -u etcd.service -f
+# sudo journalctl -u kube-apiserver.service -f
+# sudo journalctl -u kube-proxy.service -f
+
+
 
 # sudo systemctl status kubelet.service
 # sudo systemctl status etcd.service
 # sudo systemctl status kube-scheduler
+# sudo systemctl status kube-proxy
 
 # sudo systemctl status containerd.service
 # sudo systemctl status etcd.service
@@ -48,3 +74,40 @@
 # sudo systemctl stop containerd ; sudo rm -rf /run/containerd ; sudo systemctl start containerd
 
 # kubectl create serviceaccount default --namespace=default
+
+
+# Tem que ter os hosts no /etc/hosts
+# curl -k https://127.0.0.1:6443/version --cacert /etc/kubernetes/pki/ca.crt
+# curl -k https://k8scontrol1:6443/version --cacert /etc/kubernetes/pki/ca.crt
+# curl -k https://server.kubernetes.local:6443/version --cacert /etc/kubernetes/pki/ca.crt
+
+# curl -k https://server.kubernetes.local:6443/apis/coordination.k8s.io/v1/namespaces/kube-node-lease/leases/k8scontrol1?timeout=10s --cacert /etc/kubernetes/pki/ca.crt
+
+#  ip a | grep cni0 
+#  ip route
+# sudo iptables -t nat -L -n -v
+
+
+# etcdctl member list
+
+
+# kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'
+# kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" - "}{.spec.podCIDR}{"\n"}{end}'
+
+# kubectl cluster-info
+# kubectl get events --sort-by='.metadata.creationTimestamp'
+
+# while true; do curl --max-time 2 10.33.0.137; sleep 1; done
+# kubectl exec -it pod/nginx-debug-59f7fcbcfd-k7vkp -- sh -c "while true; do curl --max-time 2 10.33.0.137; sleep 1; done"
+
+# Check Kube-Proxy Mode
+# curl -v localhost:10249/proxyMode
+
+# list the IPtables rules
+# sudo iptables -t nat -L PREROUTING
+
+# check what’s inside this KUBE-SERVICES
+# sudo iptables -t nat -L KUBE-SERVICES
+
+# check chain
+# sudo iptables -t nat -L KUBE-SVC-SPFLCYIMJOE6H6YE

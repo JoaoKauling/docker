@@ -5,14 +5,15 @@ Documentation=https://github.com/kubernetes/kubernetes
 [Service]
 ExecStart=/usr/local/bin/kube-controller-manager \
   --bind-address=0.0.0.0 \
-  --cluster-cidr=10.200.0.0/16 \
+  --cluster-cidr={{ clusterCIDR }} \
+  --allocate-node-cidrs=true \
   --cluster-name=kubernetes \
   --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt \
   --cluster-signing-key-file=/etc/kubernetes/pki/ca.key \
   --kubeconfig=/etc/kubernetes/kube-controller-manager.config \
   --root-ca-file=/etc/kubernetes/pki/ca.crt \
   --service-account-private-key-file=/etc/kubernetes/pki/service-accounts.key \
-  --service-cluster-ip-range=10.32.0.0/24 \
+  --service-cluster-ip-range={{ service_cluster_ip_range }}  \
   --use-service-account-credentials=true \
   --v=2
 Restart=on-failure

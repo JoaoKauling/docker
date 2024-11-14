@@ -1,12 +1,13 @@
 - name: Default playbook - Starting Deploy
-  hosts: all
+  hosts: k8scontrol1, k8snode1, k8snode2
   become: true
   roles:
     #- prepare_env
-    - container_runtime    
-    - prepare_kubelet_etcd
+    #- container_runtime    
+    #- prepare_kubelet_etcd
     #- prepare_control_plane
-    #- prepare_worker_nodes
     #- certificates
+    #- coreDNS
     - restart
+    #- remove
 

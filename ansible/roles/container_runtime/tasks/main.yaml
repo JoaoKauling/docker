@@ -48,6 +48,11 @@
     state: absent
 
 # Configure CNI Networking
+# 10-bridge.conf: Este arquivo configura a rede do tipo bridge para os pods, usando a interface cni0. 
+# Ele também define um bloco de IP (10.200.3.0/24) para os pods e uma configuração de IP masquedado (ipMasq: true), permitindo que os pods tenham acesso à rede externa.
+#
+# 99-loopback.conf: Este arquivo configura a rede de loopback para os pods, algo essencial para a comunicação interna dentro de cada pod.
+#
 - name: Configure CNI Networking
   template:
     src: "{{item}}"
@@ -55,12 +60,6 @@
   loop:
     - "10-bridge.conf"
     - "99-loopback.conf"
-
-# Configure SUBNET
-- name: Configure SUBNET
-  shell: |
-    sed "s|SUBNET|{{ subnet }}|g" /etc/cni/net.d/10-bridge.conf > /etc/cni/net.d/10-bridge.conf.tmp
-    mv /etc/cni/net.d/10-bridge.conf.tmp /etc/cni/net.d/10-bridge.conf
 
 ###############################
 # High Level container runtime
@@ -125,3 +124,34 @@
   file:
     path: /tmp/crictl.tar.gz
     state: absent
+
+
+###############################
+# Pod Network Routes
+# Routing Table
+# Em uma instalacao manuall isso eh necessario uma vez que adiciona uma rota para a sub-rede de outro nó, 
+# permitindo a comunicação entre nós em sub-redes diferentes dentro da mesma rede física.
+#
+# control-plane -> sudo ip route add 10.200.3.0/24 via 192.168.129.225
+# worker node   -> sudo ip route add 10.200.1.0/24 via 192.168.129.224
+###############################
+# Add route to other node subnets
+#- name: Add route to other node subnets
+#  command:
+#    cmd: "ip route add {{ hostvars[item].subnet }} via {{ hostvars[item].host_ip }}"
+#  loop: "{{ groups['all'] }}"
+#  when: hostvars[item].subnet != hostvars[inventory_hostname].subnet
+
+# Template for clusterip-routes.service
+- name: Template for clusterip-routes.service
+  template:
+    src: clusterip-routes.service
+    dest: /etc/systemd/system/clusterip-routes.service
+
+# Enable and start clusterip-routes.service
+- name: Enable and start clusterip-routes.service
+  shell: |
+    systemctl daemon-reload
+    systemctl enable clusterip-routes.service
+    systemctl start clusterip-routes.service
+    systemctl restart clusterip-routes.service

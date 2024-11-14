@@ -9,26 +9,26 @@
   copy:
     src: kube-apiserver_v{{ k8s_version }}
     dest: /tmp/kube-apiserver
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Install kube-apiserver
 - name: Install kube-apiserver
   command: install -m 755 /tmp/kube-apiserver /usr/local/bin/
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Template for kube-apiserver.service
 - name: Template for kube-apiserver.service
   template:
     src: kube-apiserver.service
     dest: /etc/systemd/system/kube-apiserver.service
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Template for kube-apiserver.service
 - name: Template for kube-apiserver.service
   template:
     src: encryption-config.yaml
     dest: /etc/kubernetes/config/encryption-config.yaml    
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Enable and start kube-apiserver.service
 - name: Enable and start kube-apiserver.service
@@ -36,7 +36,7 @@
     systemctl daemon-reload
     systemctl enable kube-apiserver.service
     systemctl stop kube-apiserver.service
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 ###############################
 # kube-scheduler
@@ -48,26 +48,26 @@
   copy:
     src: kube-scheduler_v{{ k8s_version }}
     dest: /tmp/kube-scheduler
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Install kube-scheduler
 - name: Install kube-scheduler
   command: install -m 755 /tmp/kube-scheduler /usr/local/bin/
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Template for kube-scheduler.yaml
 - name: Template for kube-scheduler.yaml
   template:
     src: kube-scheduler.yaml
     dest: /etc/kubernetes/config/kube-scheduler.yaml
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Template for kube-scheduler.service
 - name: Template for kube-scheduler.service
   template:
     src: kube-scheduler.service
     dest: /etc/systemd/system/kube-scheduler.service
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Enable and start kube-scheduler.service
 - name: Enable and start kube-scheduler.service
@@ -75,7 +75,7 @@
     systemctl daemon-reload
     systemctl enable kube-scheduler.service
     systemctl stop kube-scheduler.service
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 
 ###############################
@@ -88,19 +88,19 @@
   copy:
     src: kube-controller-manager_v{{ k8s_version }}
     dest: /tmp/kube-controller-manager
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Install kube-controller-manager
 - name: Install kube-controller-manager
   command: install -m 755 /tmp/kube-controller-manager /usr/local/bin/
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Template for kube-controller-manager.service
 - name: Template for kube-controller-manager.service
   template:
     src: kube-controller-manager.service
     dest: /etc/systemd/system/kube-controller-manager.service
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # Enable and start kube-controller-manager.service
 - name: Enable and start kube-controller-manager.service
@@ -108,7 +108,7 @@
     systemctl daemon-reload
     systemctl enable kube-controller-manager.service
     systemctl stop kube-controller-manager.service
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 ###############################
 #
@@ -123,7 +123,7 @@
     - "/tmp/kube-apiserver"
     - "/tmp/kube-controller-manager"
     - "/tmp/kube-scheduler"
-  when: host_type == "control_plane"
+  when: host_type == "control_plane" or host_type == "control_plane_master"
 
 # sudo journalctl -u kube-apiserver.service -f
 # sudo journalctl -u kube-scheduler.service -f

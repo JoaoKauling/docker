@@ -8,6 +8,7 @@
   copy:
     src: "etcd-v{{ etcd_version }}-linux-{{ host_arch }}.tar.gz"
     dest: /tmp/etcd.tar.gz 
+  when: etcd_version is defined
 
 #Decompress nodejs
 - name: Decompress nodejs
@@ -15,16 +16,19 @@
     src: /tmp/etcd.tar.gz
     dest: "/tmp/"
     remote_src: yes
+  when: etcd_version is defined
 
 # Move etcd files to /usr/local/bin/
 - name: Move etcd files to /usr/local/bin/
   shell: mv /tmp/etcd-v{{ etcd_version }}-linux-{{ host_arch }}/etcd* /usr/local/bin/
+  when: etcd_version is defined
 
 # Template for etcd.service
 - name: Template for etcd.service
   template:
     src: etcd.service
     dest: /etc/systemd/system/etcd.service
+  when: etcd_version is defined
 
 # Enable and start etcd.service
 - name: Enable and start etcd.service
@@ -32,6 +36,7 @@
     systemctl daemon-reload
     systemctl enable etcd.service
     systemctl stop etcd.service
+  when: etcd_version is defined
 
 ###############################
 # kubelet
@@ -54,12 +59,6 @@
     src: kubelet-config.yaml
     dest: /etc/kubernetes/config/kubelet-config.yaml
 
-# Configure SUBNET
-- name: Configure SUBNET
-  shell: |
-    sed "s|SUBNET|{{ subnet }}|g" /etc/kubernetes/config/kubelet-config.yaml > /etc/kubernetes/config/kubelet-config.yaml.tmp
-    mv /etc/kubernetes/config/kubelet-config.yaml.tmp /etc/kubernetes/config/kubelet-config.yaml.conf
-
 # Template for kubelet.service
 - name: Template for kubelet.service
   template:
@@ -72,6 +71,41 @@
     systemctl daemon-reload
     systemctl enable kubelet.service
     systemctl stop kubelet.service
+
+
+###############################
+# kube-proxy
+# https://kubernetes.io/releases/download/
+###############################
+
+# Download kube-proxy
+- name: Download kube-proxy
+  copy:
+    src: kube-proxy_v{{ k8s_version }}
+    dest: /tmp/kube-proxy 
+
+# Install kube-proxy
+- name: Install kube-proxy
+  command: install -m 755 /tmp/kube-proxy /usr/local/bin/
+
+# Template for kube-proxy.service
+- name: Template for kube-proxy.service
+  template:
+    src: kube-proxy.service
+    dest: /etc/systemd/system/kube-proxy.service
+
+# Template for kube-proxy-config.yaml
+- name: Template for kube-proxy-config.yaml
+  template:
+    src: kube-proxy-config.yaml
+    dest: /etc/kubernetes/config/kube-proxy-config.yaml
+
+# Enable and start kube-proxy.service
+- name: Enable and start kube-proxy.service
+  shell: |
+    systemctl daemon-reload
+    systemctl enable kube-proxy.service
+    systemctl stop kube-proxy.service
 
 ###############################
 # kubectl
@@ -88,7 +122,6 @@
 - name: Install kubectl
   command: install -m 755 /tmp/kubectl /usr/local/bin/
 
-
 ###############################
 #
 #
@@ -99,13 +132,8 @@
     path: "{{item}}"
     state: absent
   loop:
-    - "/tmp/etcd.tar.gz "
+    - "/tmp/etcd.tar.gz"
     - "/tmp/kubectl"
     - "/tmp/kubelet"
 
 
-# sudo journalctl -u kubelet.service -f
-# sudo journalctl -u etcd.service -f
-
-# systemctl status kubelet.service
-# systemctl status etcd.service

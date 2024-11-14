@@ -1,0 +1,15 @@
+[Unit]
+Description=CoreDNS DNS Server
+After=network.target
+
+[Service]
+Environment="KUBERNETES_SERVICE_HOST=127.0.0.1"
+Environment="KUBERNETES_SERVICE_PORT=6443"
+Environment="CLUSTER_DNS={{ clusterDNS }}"  
+
+ExecStart=/usr/local/bin/coredns -conf /etc/coredns/Corefile
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

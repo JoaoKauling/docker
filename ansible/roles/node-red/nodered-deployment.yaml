@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodered-deployment
+  labels:
+    app: nodered
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nodered
+  template:
+    metadata:
+      labels:
+        app: nodered
+    spec:
+      #nodeName: k8snode1
+      containers:
+      - name: nodered
+        image: nodered/node-red:latest-22
+        ports:
+        - containerPort: 1880

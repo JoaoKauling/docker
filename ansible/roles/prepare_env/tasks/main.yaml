@@ -21,6 +21,8 @@
       - socat 
       - conntrack 
       - ipset
+      - curl
+      - sshpass
 
 - name: Set sudoers
   copy:
@@ -31,7 +33,6 @@
     group: root
     mode: '0440'
   when: ansible_os_family != 'RedHat'  
-
 
 - name: Add hosts to /etc/hosts
   lineinfile:
@@ -76,6 +77,7 @@
     - "/etc/kubernetes/pki/"
     - "/etc/kubernetes/scripts/"
     - "/etc/etcd/"
+    - "/home/{{ root_user }}/.kube/"  
 
 #Create directory structure for kubernetes
 - name: Create directory structure for kubernetes
